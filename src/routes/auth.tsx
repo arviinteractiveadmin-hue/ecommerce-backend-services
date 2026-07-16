@@ -1,7 +1,7 @@
 import { createFileRoute, useRouter, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useStore } from "@/lib/store";
+import { useLogin, useRegister, useForgotPassword } from "@/hooks/use-auth";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -14,22 +14,50 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const router = useRouter();
-  const signIn = useStore((s) => s.signIn);
   const [tab, setTab] = useState<"login" | "register" | "forgot">("login");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
 
-  const submit = (e: React.FormEvent) => {
+  const loginMutation = useLogin();
+  const registerMutation = useRegister();
+  const forgotMutation = useForgotPassword();
+
+  const isPending = loginMutation.isPending || registerMutation.isPending || forgotMutation.isPending;
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (tab === "forgot") {
-      toast.success("Reset link sent", { description: `If ${email} is registered, you'll receive an email.` });
-      setTab("login");
+      forgotMutation.mutate(email, {
+        onSuccess: () => {
+          toast.success("Reset link sent", {
+            description: `If ${email} is registered, you'll receive an email.`,
+          });
+          setTab("login");
+        },
+        onError: (err) => toast.error(err.message),
+      });
       return;
     }
-    signIn({ name: name || email.split("@")[0] || "Friend", email });
-    toast.success(tab === "login" ? "Welcome back" : "Account created");
-    router.navigate({ to: "/account" });
+
+    if (tab === "login") {
+      loginMutation.mutate({ email, password }, {
+        onSuccess: () => {
+          toast.success("Welcome back");
+          router.navigate({ to: "/account" });
+        },
+        onError: (err) => toast.error(err.message),
+      });
+    } else {
+      registerMutation.mutate({ name: name || email.split("@")[0], email, password }, {
+        onSuccess: () => {
+          toast.success("Account created");
+          router.navigate({ to: "/account" });
+        },
+        onError: (err) => toast.error(err.message),
+      });
+    }
   };
 
   return (
@@ -86,8 +114,8 @@ function AuthPage() {
                     Forgot password?
                   </button>
                 )}
-                <Button type="submit" size="lg" className="w-full rounded-full">
-                  {tab === "login" ? "Sign in" : "Create account"}
+                <Button type="submit" size="lg" className="w-full rounded-full" disabled={isPending}>
+                  {isPending ? "Please wait…" : tab === "login" ? "Sign in" : "Create account"}
                 </Button>
               </form>
 
@@ -96,8 +124,8 @@ function AuthPage() {
                 <span className="absolute left-0 right-0 top-1/2 -z-10 h-px bg-border" />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" className="rounded-full">Google</Button>
-                <Button variant="outline" className="rounded-full">Apple</Button>
+                <Button variant="outline" className="rounded-full" disabled>Google</Button>
+                <Button variant="outline" className="rounded-full" disabled>Apple</Button>
               </div>
             </>
           ) : (
@@ -109,7 +137,9 @@ function AuthPage() {
                   <Label htmlFor="forgot-email">Email</Label>
                   <Input id="forgot-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
-                <Button type="submit" size="lg" className="w-full rounded-full">Send reset link</Button>
+                <Button type="submit" size="lg" className="w-full rounded-full" disabled={isPending}>
+                  {isPending ? "Sending…" : "Send reset link"}
+                </Button>
                 <button type="button" onClick={() => setTab("login")} className="block w-full text-center text-xs text-muted-foreground hover:text-foreground">
                   ← Back to sign in
                 </button>

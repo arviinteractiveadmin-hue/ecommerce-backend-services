@@ -124,3 +124,24 @@
   }
   h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
 }
+
+/*
+ * Appear-on-scroll reveal (see components/Reveal.tsx).
+ * Gated on `html.reveal-ready` so that with JS disabled — or before hydration —
+ * every [data-reveal] block stays fully visible (no blank sections). Only opacity
+ * and transform animate, so reveals stay on the compositor and never cost layout.
+ * Disabled entirely for users who prefer reduced motion.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .reveal-ready [data-reveal] {
+    opacity: 0;
+    transform: translateY(1.25rem);
+    transition:
+      opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .reveal-ready [data-reveal].is-visible {
+    opacity: 1;
+    transform: none;
+  }
+}

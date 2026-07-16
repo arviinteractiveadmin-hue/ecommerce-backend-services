@@ -1,26 +1,18 @@
-import { createFileRoute, Link, useRouter, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { Heart, Minus, Plus, Star, Truck, RotateCcw, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
-import { getProduct, products } from "@/lib/mock-products";
+import { useProduct, useRelatedProducts } from "@/hooks/use-products";
 import { money } from "@/lib/format";
 import { useStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { ProductCard } from "@/components/ProductCard";
+import { Reveal } from "@/components/Reveal";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/products/$id")({
-  loader: ({ params }) => {
-    const p = getProduct(params.id);
-    if (!p) throw notFound();
-    return { product: p };
-  },
-  head: ({ loaderData }) => ({
-    meta: [
-      { title: `${loaderData?.product.name} — Atelier` },
-      { name: "description", content: loaderData?.product.description ?? "" },
-      { property: "og:image", content: loaderData?.product.images[0] ?? "" },
-    ],
+  head: ({ params }) => ({
+    meta: [{ title: `Product — Atelier` }],
   }),
   notFoundComponent: () => (
     <div className="mx-auto max-w-md px-4 py-32 text-center">
@@ -32,19 +24,52 @@ export const Route = createFileRoute("/products/$id")({
   component: PDP,
 });
 
+function PDPSkeleton() {
+  return (
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 animate-pulse">
+      <div className="grid gap-10 lg:grid-cols-2">
+        <div className="aspect-square rounded-xl bg-secondary" />
+        <div className="space-y-4 pt-4">
+          <div className="h-3 w-24 rounded bg-secondary" />
+          <div className="h-8 w-3/4 rounded bg-secondary" />
+          <div className="h-4 w-1/3 rounded bg-secondary" />
+          <div className="h-6 w-1/4 rounded bg-secondary" />
+          <div className="h-16 w-full rounded bg-secondary" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PDP() {
-  const { product } = Route.useLoaderData();
+  const { id } = Route.useParams();
   const router = useRouter();
+
+  const { data, isLoading, isError } = useProduct(id);
+  const { data: related } = useRelatedProducts(id);
+
   const [activeImg, setActiveImg] = useState(0);
-  const [size, setSize] = useState(product.sizes?.[0]);
-  const [color, setColor] = useState(product.colors?.[0]?.name);
+  const [size, setSize] = useState<string | undefined>();
+  const [color, setColor] = useState<string | undefined>();
   const [qty, setQty] = useState(1);
+
   const addToCart = useStore((s) => s.addToCart);
   const wishlist = useStore((s) => s.wishlist);
   const toggleWishlist = useStore((s) => s.toggleWishlist);
-  const saved = wishlist.includes(product.id);
 
-  const related = products.filter((p) => p.id !== product.id && p.category === product.category).slice(0, 4);
+  if (isLoading) return <PDPSkeleton />;
+
+  if (isError || !data) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-32 text-center">
+        <h1 className="font-display text-3xl">Product not found</h1>
+        <Link to="/products" className="mt-4 inline-block text-primary underline">Back to shop</Link>
+      </div>
+    );
+  }
+
+  const { product, reviews } = data;
+  const saved = wishlist.includes(product.id);
 
   const handleAdd = (goToCart?: boolean) => {
     addToCart({
@@ -69,7 +94,9 @@ function PDP() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
       <nav className="mb-6 text-xs text-muted-foreground">
-        <Link to="/" className="hover:text-foreground">Home</Link> / <Link to="/products" className="hover:text-foreground">Shop</Link> / <span className="text-foreground">{product.name}</span>
+        <Link to="/" className="hover:text-foreground">Home</Link> /{" "}
+        <Link to="/products" className="hover:text-foreground">Shop</Link> /{" "}
+        <span className="text-foreground">{product.name}</span>
       </nav>
 
       <div className="grid gap-10 lg:grid-cols-2">
@@ -79,7 +106,7 @@ function PDP() {
           </div>
           {product.images.length > 1 && (
             <div className="mt-4 flex gap-3">
-              {product.images.map((src: string, i: number) => (
+              {product.images.map((src, i) => (
                 <button
                   key={i}
                   onClick={() => setActiveImg(i)}
@@ -101,23 +128,35 @@ function PDP() {
           <div className="mt-3 flex items-center gap-3">
             <div className="flex items-center gap-1">
               {[1, 2, 3, 4, 5].map((s) => (
-                <Star key={s} className={cn("h-4 w-4", s <= Math.round(product.rating) ? "fill-primary text-primary" : "text-muted-foreground")} />
+                <Star
+                  key={s}
+                  className={cn(
+                    "h-4 w-4",
+                    s <= Math.round(product.rating) ? "fill-primary text-primary" : "text-muted-foreground",
+                  )}
+                />
               ))}
             </div>
-            <span className="text-sm text-muted-foreground">{product.rating} · {product.reviews} reviews</span>
+            <span className="text-sm text-muted-foreground">
+              {product.rating.toFixed(1)} · {product.reviews} reviews
+            </span>
           </div>
           <div className="mt-5 flex items-baseline gap-3">
             <p className="font-display text-3xl">{money(product.price)}</p>
-            {product.originalPrice && <p className="text-muted-foreground line-through">{money(product.originalPrice)}</p>}
+            {product.originalPrice && (
+              <p className="text-muted-foreground line-through">{money(product.originalPrice)}</p>
+            )}
           </div>
 
           <p className="mt-5 text-sm text-muted-foreground">{product.description}</p>
 
-          {product.colors && (
+          {product.colors && product.colors.length > 0 && (
             <div className="mt-7">
-              <p className="text-sm font-medium">Color: <span className="text-muted-foreground">{color}</span></p>
+              <p className="text-sm font-medium">
+                Color: <span className="text-muted-foreground">{color}</span>
+              </p>
               <div className="mt-3 flex gap-2">
-                {product.colors.map((c: { name: string; hex: string }) => (
+                {product.colors.map((c) => (
                   <button
                     key={c.name}
                     onClick={() => setColor(c.name)}
@@ -133,19 +172,23 @@ function PDP() {
             </div>
           )}
 
-          {product.sizes && (
+          {product.sizes && product.sizes.length > 0 && (
             <div className="mt-6">
               <p className="text-sm font-medium">Size</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                {product.sizes.map((s: string) => (
+                {product.sizes.map((s) => (
                   <button
                     key={s}
                     onClick={() => setSize(s)}
                     className={cn(
                       "min-w-12 rounded-md border px-3 py-2 text-sm",
-                      size === s ? "border-foreground bg-foreground text-background" : "border-border hover:bg-accent",
+                      size === s
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border hover:bg-accent",
                     )}
-                  >{s}</button>
+                  >
+                    {s}
+                  </button>
                 ))}
               </div>
             </div>
@@ -153,11 +196,17 @@ function PDP() {
 
           <div className="mt-7 flex items-center gap-3">
             <div className="flex items-center rounded-full border border-border">
-              <button onClick={() => setQty(Math.max(1, qty - 1))} className="p-3"><Minus className="h-4 w-4" /></button>
+              <button onClick={() => setQty(Math.max(1, qty - 1))} className="p-3">
+                <Minus className="h-4 w-4" />
+              </button>
               <span className="w-8 text-center text-sm font-medium">{qty}</span>
-              <button onClick={() => setQty(qty + 1)} className="p-3"><Plus className="h-4 w-4" /></button>
+              <button onClick={() => setQty(qty + 1)} className="p-3">
+                <Plus className="h-4 w-4" />
+              </button>
             </div>
-            <Button onClick={() => handleAdd(false)} className="flex-1 rounded-full" size="lg">Add to cart</Button>
+            <Button onClick={() => handleAdd(false)} className="flex-1 rounded-full" size="lg">
+              Add to cart
+            </Button>
             <Button
               variant="outline"
               size="icon"
@@ -182,32 +231,39 @@ function PDP() {
       </div>
 
       {/* Reviews */}
-      <section className="mt-20">
-        <h2 className="font-display text-2xl">Reviews</h2>
-        <div className="mt-6 grid gap-6 md:grid-cols-3">
-          {[
-            { name: "Jamie L.", text: "Beautifully made and exactly as pictured. The fit is spot on." },
-            { name: "Morgan P.", text: "Quietly excellent. Has become my daily go-to." },
-            { name: "Riley K.", text: "Worth the price. Solid construction and great materials." },
-          ].map((r, i) => (
-            <div key={i} className="rounded-xl border border-border bg-card p-5">
-              <div className="flex gap-1">
-                {[1, 2, 3, 4, 5].map((s) => <Star key={s} className="h-3 w-3 fill-primary text-primary" />)}
+      {reviews && reviews.length > 0 && (
+        <Reveal as="section" className="mt-20">
+          <h2 className="font-display text-2xl">Reviews</h2>
+          <div className="mt-6 grid gap-6 md:grid-cols-3">
+            {reviews.slice(0, 3).map((r) => (
+              <div key={r.id} className="rounded-xl border border-border bg-card p-5">
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star
+                      key={s}
+                      className={cn("h-3 w-3", s <= r.rating ? "fill-primary text-primary" : "text-muted-foreground")}
+                    />
+                  ))}
+                </div>
+                {r.comment && <p className="mt-3 text-sm">{r.comment}</p>}
+                <p className="mt-3 text-xs text-muted-foreground">
+                  — {r.user.firstName} {r.user.lastName.charAt(0)}.
+                </p>
               </div>
-              <p className="mt-3 text-sm">{r.text}</p>
-              <p className="mt-3 text-xs text-muted-foreground">— {r.name}</p>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </Reveal>
+      )}
 
       {/* Related */}
-      <section className="mt-20">
-        <h2 className="font-display text-2xl">You might also like</h2>
-        <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 lg:grid-cols-4">
-          {related.map((p) => <ProductCard key={p.id} product={p} />)}
-        </div>
-      </section>
+      {related && related.length > 0 && (
+        <Reveal as="section" className="mt-20">
+          <h2 className="font-display text-2xl">You might also like</h2>
+          <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 lg:grid-cols-4">
+            {related.slice(0, 4).map((p) => <ProductCard key={p.id} product={p} />)}
+          </div>
+        </Reveal>
+      )}
     </div>
   );
 }

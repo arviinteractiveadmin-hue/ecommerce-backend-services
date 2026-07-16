@@ -1,7 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Truck, ShieldCheck, RotateCcw } from "lucide-react";
-import { products, categories } from "@/lib/mock-products";
+import { useProducts, useCategories } from "@/hooks/use-products";
 import { ProductCard } from "@/components/ProductCard";
+import { Reveal } from "@/components/Reveal";
+
+const CATEGORY_IMAGES: Record<string, string> = {
+  sneakers: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80",
+  footwear: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=600&q=80",
+  bags: "https://images.unsplash.com/photo-1591561954557-26941169b49e?auto=format&fit=crop&w=600&q=80",
+  apparel: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?auto=format&fit=crop&w=600&q=80",
+  accessories: "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?auto=format&fit=crop&w=600&q=80",
+};
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -13,9 +22,23 @@ export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
+function ProductSkeleton() {
+  return (
+    <div className="space-y-3 animate-pulse">
+      <div className="aspect-[4/5] rounded-lg bg-secondary" />
+      <div className="h-3 w-1/2 rounded bg-secondary" />
+      <div className="h-4 w-3/4 rounded bg-secondary" />
+    </div>
+  );
+}
+
 function HomePage() {
-  const featured = products.filter((p) => p.featured).slice(0, 4);
-  const bestsellers = products.filter((p) => p.bestseller).slice(0, 4);
+  const { data: featuredData, isLoading: featLoading } = useProducts({ featured: true, limit: 4, sort: "newest" });
+  const { data: allData, isLoading: allLoading } = useProducts({ limit: 4, sort: "popular" });
+  const { data: categories } = useCategories();
+
+  const featured = featuredData?.products ?? [];
+  const popular = allData?.products ?? [];
 
   return (
     <div>
@@ -39,10 +62,10 @@ function HomePage() {
               </Link>
               <Link
                 to="/products"
-                search={{ category: "Footwear" } as never}
+                search={{ category: "Sneakers" } as never}
                 className="inline-flex items-center rounded-full border border-border px-6 py-3 text-sm font-medium hover:bg-accent"
               >
-                Browse footwear
+                Browse sneakers
               </Link>
             </div>
           </div>
@@ -63,48 +86,58 @@ function HomePage() {
       </section>
 
       {/* Categories */}
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
-        <div className="flex items-end justify-between">
-          <h2 className="font-display text-3xl">Shop by category</h2>
-          <Link to="/products" className="text-sm text-muted-foreground hover:text-foreground">All →</Link>
-        </div>
-        <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-          {categories.map((c) => (
-            <Link
-              key={c.slug}
-              to="/products"
-              search={{ category: c.name } as never}
-              className="group relative overflow-hidden rounded-xl bg-secondary"
-            >
-              <div className="aspect-[3/4]">
-                <img src={c.image} alt={c.name} className="h-full w-full object-cover transition group-hover:scale-105" />
-              </div>
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-4">
-                <p className="font-display text-xl text-white">{c.name}</p>
-              </div>
-            </Link>
-          ))}
-        </div>
-      </section>
+      {categories && categories.length > 0 && (
+        <Reveal as="section" className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+          <div className="flex items-end justify-between">
+            <h2 className="font-display text-3xl">Shop by category</h2>
+            <Link to="/products" className="text-sm text-muted-foreground hover:text-foreground">All →</Link>
+          </div>
+          <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+            {categories.map((c) => (
+              <Link
+                key={c.slug}
+                to="/products"
+                search={{ category: c.name } as never}
+                className="group relative overflow-hidden rounded-xl bg-secondary"
+              >
+                <div className="aspect-[3/4]">
+                  <img
+                    src={CATEGORY_IMAGES[c.slug] ?? `https://picsum.photos/seed/${c.slug}/600/800`}
+                    alt={c.name}
+                    className="h-full w-full object-cover transition group-hover:scale-105"
+                  />
+                </div>
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-4">
+                  <p className="font-display text-xl text-white">{c.name}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </Reveal>
+      )}
 
       {/* Featured */}
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+      <Reveal as="section" className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
         <h2 className="font-display text-3xl">Featured</h2>
         <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 lg:grid-cols-4">
-          {featured.map((p) => <ProductCard key={p.id} product={p} />)}
+          {featLoading
+            ? Array.from({ length: 4 }).map((_, i) => <ProductSkeleton key={i} />)
+            : featured.map((p) => <ProductCard key={p.id} product={p} />)}
         </div>
-      </section>
+      </Reveal>
 
-      {/* Bestsellers */}
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
-        <h2 className="font-display text-3xl">Bestsellers</h2>
+      {/* Popular */}
+      <Reveal as="section" className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
+        <h2 className="font-display text-3xl">Most popular</h2>
         <div className="mt-8 grid grid-cols-2 gap-x-4 gap-y-10 lg:grid-cols-4">
-          {bestsellers.map((p) => <ProductCard key={p.id} product={p} />)}
+          {allLoading
+            ? Array.from({ length: 4 }).map((_, i) => <ProductSkeleton key={i} />)
+            : popular.map((p) => <ProductCard key={p.id} product={p} />)}
         </div>
-      </section>
+      </Reveal>
 
       {/* Promise */}
-      <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
+      <Reveal as="section" className="mx-auto max-w-7xl px-4 py-16 sm:px-6">
         <div className="grid gap-6 rounded-2xl bg-secondary/60 p-8 md:grid-cols-3 md:p-12">
           {[
             { icon: Truck, t: "Free shipping over $80", d: "On all domestic orders." },
@@ -120,7 +153,7 @@ function HomePage() {
             </div>
           ))}
         </div>
-      </section>
+      </Reveal>
     </div>
   );
 }

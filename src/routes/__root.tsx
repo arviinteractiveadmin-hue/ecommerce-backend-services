@@ -107,6 +107,13 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        {/* Activates scroll-reveal before first paint; if JS is off, the gate is
+            never added and all [data-reveal] blocks stay visible. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: "document.documentElement.classList.add('reveal-ready')",
+          }}
+        />
       </head>
       <body>
         {children}

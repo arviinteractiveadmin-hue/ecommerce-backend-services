@@ -37,12 +37,15 @@ export type User = {
 
 type Store = {
   user: User | null;
+  accessToken: string | null;
+  refreshToken: string | null;
   cart: CartItem[];
   wishlist: string[];
   orders: Order[];
   addresses: Address[];
   signIn: (u: User) => void;
   signOut: () => void;
+  setTokens: (access: string, refresh: string) => void;
   addToCart: (item: CartItem) => void;
   updateQty: (productId: string, size: string | undefined, color: string | undefined, q: number) => void;
   removeFromCart: (productId: string, size?: string, color?: string) => void;
@@ -59,12 +62,15 @@ export const useStore = create<Store>()(
   persist(
     (set) => ({
       user: null,
+      accessToken: null,
+      refreshToken: null,
       cart: [],
       wishlist: [],
       orders: [],
       addresses: [],
       signIn: (u) => set({ user: u }),
-      signOut: () => set({ user: null }),
+      signOut: () => set({ user: null, accessToken: null, refreshToken: null }),
+      setTokens: (access, refresh) => set({ accessToken: access, refreshToken: refresh }),
       addToCart: (item) =>
         set((s) => {
           const existing = s.cart.find((c) => sameLine(c, item.productId, item.size, item.color));

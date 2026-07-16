@@ -2,7 +2,7 @@ export type Product = {
   id: string;
   name: string;
   brand: string;
-  category: "Footwear" | "Bags" | "Apparel" | "Accessories";
+  category: string;
   price: number;
   originalPrice?: number;
   rating: number;
